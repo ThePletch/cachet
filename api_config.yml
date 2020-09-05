@@ -1,6 +1,5 @@
-proxied_api_basename: https://api-v3.mbta.com/
-proxied_api_key: 5b1ca80157b74611857c912337044985
-proxy_cache_ttl_seconds: 60
-specific_cache_ttl_seconds:
+PROXY_CACHE_TTL_SECONDS: 60
+SPECIFIC_CACHE_TTL_SECONDS:
   stops: 86400
   routes: 86400
+AWS_REGION: us-east-1

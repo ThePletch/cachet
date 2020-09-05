@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Resources:
+  MbtaProxyInvocationFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: MbtaProxyInvoker
+      Handler: lambda.handler
+      Runtime: ruby2.5
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FeedbackTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProxyCacheTable
+        - Version: 2012-10-17
+          Statement:
+            - Action:
+              - dynamodb:ListTables
+              Effect: Allow
+              Resource: '*'
+
+      CodeUri: "./"
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          ALLOWED_ORIGIN: 'http://localhost:3000'
+          PROXIED_API_BASENAME: 'https://api-v3.mbta.com/'
+          PROXIED_API_KEY: 5b1ca80157b74611857c912337044985
+      Events:
+        MbtaProxyApi:
+            Type: Api
+            Properties:
+                Path: /
+                Method: ANY
+                RestApiId: !Ref MbtaProxyApi
+  MbtaProxyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: MbtaProxyApi
+      StageName: Prod
+      DefinitionBody:
+        swagger: '2.0'
+        basePath: '/Prod'
+        info:
+          title: !Ref AWS::StackName
+        paths:
+          /{proxy+}:
+            x-amazon-apigateway-any-method:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri:
+                  !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MbtaProxyInvocationFunction.Arn}/invocations'
+                passthroughBehavior: "when_no_match"
+                httpMethod: POST
+                type: "aws_proxy"
+          /:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri:
+                  !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MbtaProxyInvocationFunction.Arn}/invocations'
+                passthroughBehavior: "when_no_match"
+                httpMethod: POST
+                type: "aws_proxy"
+  ConfigLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    DependsOn:
+    - MbtaProxyInvocationFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref MbtaProxyInvocationFunction
+      Principal: apigateway.amazonaws.com
+  FeedbackTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: MbtaProxyFeedbackServerlessSinatraTable
+      PrimaryKey:
+        Name: id
+        Type: String
+  ProxyCacheTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: MbtaProxyCache
+      PrimaryKey:
+        Name: cache_key
+        Type: String
+Outputs:
+  SinatraAppUrl:
+    Description: App endpoint URL
+    Value: !Sub "https://${MbtaProxyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

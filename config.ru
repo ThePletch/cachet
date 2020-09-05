@@ -1,4 +1,4 @@
-$:.unshift(File.expand_path('../', __FILE__))
+$:.unshift(File.expand_path('../app', __FILE__))
 
 require 'proxy'
 

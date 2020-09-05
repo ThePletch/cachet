@@ -1,5 +1,6 @@
 require 'httpclient'
-require 'yaml'
+
+require 'config'
 
 class ExternalApi
   class << self
@@ -12,41 +13,37 @@ class ExternalApi
     end
 
     def cache_ttl_for_path(path)
-      ttl_key = self.config('specific_cache_ttl_seconds').keys.find{|k| k.start_with? path }
+      ttl_key = Config.get('SPECIFIC_CACHE_TTL_SECONDS').keys.find{|k| path.start_with? k }
       if ttl_key.nil?
-        self.config('proxy_cache_ttl_seconds')
+        Config.get('PROXY_CACHE_TTL_SECONDS')
       else
-        self.config('specific_cache_ttl_seconds')[ttl_key]
+        Config.get('SPECIFIC_CACHE_TTL_SECONDS')[ttl_key]
       end
     end
 
     protected
 
-    def config(key)
-      @config ||= YAML.load_file('api_config.yml')
-
-      @config.fetch(key)
-    end
-
     def base_params
-      { 'api_key' => self.config('proxied_api_key') }
+      { 'api_key' => Config.get('PROXIED_API_KEY') }
     end
 
     def site
-      self.config('proxied_api_basename')
+      Config.get('PROXIED_API_BASENAME')
     end
 
     def queryize_params(params)
       queryized_params = {}
 
       params.each do |k, v|
+        decoded_key = URI.unescape(k)
         if v.is_a?(Hash)
           v.each do |subkey, subval|
-            queryized_subkey = "#{k}[#{subkey}]"
-            queryized_params[queryized_subkey] = subval
+            decoded_subvalue = URI.unescape(subval)
+            queryized_subkey = "#{decoded_key}[#{subkey}]"
+            queryized_params[queryized_subkey] = decoded_subvalue
           end
         else
-          queryized_params[k] = v
+          queryized_params[decoded_key] = URI.unescape(v)
         end
       end
 

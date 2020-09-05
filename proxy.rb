@@ -24,10 +24,8 @@ class Proxy < Sinatra::Base
 
   def fetch_cache(key, ttl_seconds:)
     if Proxy.cache.has_key?(key) and Proxy.cache[key][:expiration] > Time.now
-      puts "cache hit for #{key}"
       Proxy.cache[key][:value]
     else
-      puts "cache miss for #{key}"
       result = yield
       Proxy.cache[key] = {
         expiration: Time.now + ttl_seconds,

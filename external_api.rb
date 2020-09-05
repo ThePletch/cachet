@@ -3,29 +3,12 @@ require 'yaml'
 
 class ExternalApi
   class << self
-    def config(key)
-      @config ||= YAML.load_file('api_config.yml')
-
-      @config.fetch(key)
-    end
-
-    def base_params
-      {
-          api_key: self.config('proxied_api_key')
-      }
-    end
-
-    def site
-      self.config('proxied_api_basename')
-    end
-
     def make_query(path, params)
       client = HTTPClient.new
       uri = URI.join(self.site, path)
 
-      params = self.base_params.merge(params)
-
-      client.get_content(uri, params)  # we'll worry about error handling later
+      merged_params = queryize_params(self.base_params.merge(params))
+      client.get_content(uri, merged_params)
     end
 
     def cache_ttl_for_path(path)
@@ -35,6 +18,39 @@ class ExternalApi
       else
         self.config('specific_cache_ttl_seconds')[ttl_key]
       end
+    end
+
+    protected
+
+    def config(key)
+      @config ||= YAML.load_file('api_config.yml')
+
+      @config.fetch(key)
+    end
+
+    def base_params
+      { 'api_key' => self.config('proxied_api_key') }
+    end
+
+    def site
+      self.config('proxied_api_basename')
+    end
+
+    def queryize_params(params)
+      queryized_params = {}
+
+      params.each do |k, v|
+        if v.is_a?(Hash)
+          v.each do |subkey, subval|
+            queryized_subkey = "#{k}[#{subkey}]"
+            queryized_params[queryized_subkey] = subval
+          end
+        else
+          queryized_params[k] = v
+        end
+      end
+
+      queryized_params
     end
   end
 end
